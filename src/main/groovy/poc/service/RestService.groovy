@@ -1,6 +1,8 @@
 package poc.service
 
 import com.google.inject.Inject
+import com.netflix.hystrix.HystrixCommandGroupKey
+import com.netflix.hystrix.HystrixObservableCommand
 import net.sf.ehcache.Cache
 import net.sf.ehcache.Element
 import net.sf.ehcache.config.CacheConfiguration
@@ -12,6 +14,8 @@ import ratpack.http.client.internal.DefaultHttpClient
 import ratpack.launch.LaunchConfig
 import ratpack.launch.LaunchConfigs
 import rx.Observable
+import rx.functions.Action1
+
 import static ratpack.rx.RxRatpack.observe
 
 import net.sf.ehcache.CacheManager
@@ -54,11 +58,32 @@ class RestService {
 		} else {
 			println "Cache Miss"
 			def client = HttpClients.httpClient(launchConfig)
-			def observableResponse = observe(client.get(url))
+
+			def observableResponseCommand = new HystrixObservableCommand<ReceivedResponse>(HystrixCommandGroupKey.Factory.asKey("http-get")) {
+
+				@Override
+				protected Observable<ReceivedResponse> run() {
+
+					def observable = observe(client.get(url))
+
+					return observable
+				}
+
+			}
+			println observableResponseCommand.isCircuitBreakerOpen()
+
+
+			def observableResponse = observableResponseCommand.toObservable()
+
+
+			//This correctly throws an error
+			//def observableResponse = observe(client.get(url))
+
+			//Cache if we should
 			observableResponse.subscribe({ ReceivedResponse receivedResponse ->
 				def cacheControl = parseCacheHeader(receivedResponse.headers.get("Cache-Control"))
 				println cacheControl
-				def maxAge =  cacheControl['max-age'] ?: 0
+				def maxAge = cacheControl['max-age'] ?: 0
 				if (!cacheControl['no-cache'] && maxAge > 0) {
 					println "Caching"
 
@@ -67,6 +92,7 @@ class RestService {
 					restCache.put(elm)
 				}
 			})
+
 
 			return observableResponse
 		}
