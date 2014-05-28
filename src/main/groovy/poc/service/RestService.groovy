@@ -84,6 +84,7 @@ class RestService {
 				def cacheControl = parseCacheHeader(receivedResponse.headers.get("Cache-Control"))
 				println cacheControl
 				def maxAge = cacheControl['max-age'] ?: 0
+				maxAge=30
 				if (!cacheControl['no-cache'] && maxAge > 0) {
 					println "Caching"
 
@@ -91,6 +92,8 @@ class RestService {
 					elm.timeToLive = maxAge
 					restCache.put(elm)
 				}
+			},(Action1<Throwable>){Throwable throwable ->
+				println throwable
 			})
 
 

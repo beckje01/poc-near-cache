@@ -13,23 +13,15 @@ ratpack {
 		get {
 
 			def url = request.queryParams.get("url")
-			//			if (url) {
 
 			def result = restService.getResource(url)
-			result.single().subscribe {
+			result.single().subscribe({
 				println "here " + it.statusCode
-				context.render "Got: "+it.statusCode
-			}
-			result.doOnError(new Action1<Throwable>() {
-				@Override
-				void call(Throwable throwable) {
-					context.render "Error happened ${throwable}"
-				}
+				context.render "Got: " + it.statusCode
+			}, (Action1<Throwable>){
+				println "error"
+				context.render "Error"
 			})
-
-			//			} else {
-			//				render "Please provide a url"
-			//			}
 
 		}
 
